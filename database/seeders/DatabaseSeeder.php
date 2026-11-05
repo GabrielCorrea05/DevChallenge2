@@ -145,3 +145,13 @@ class DatabaseSeeder extends Seeder
             'created_by' => $user->id,
         ]);
         $sampleProduct2->tags()->syncWithoutDetaching([$createdTags['Bonpreu-Esclat']->id]);
+
+        Activity::create([
+            'list_id' => $list->id,
+            'user_id' => $user->id,
+            'action' => 'creó la lista',
+            'subject_name' => $list->name,
+            'created_at' => now(),
+        ]);
+    }
+}

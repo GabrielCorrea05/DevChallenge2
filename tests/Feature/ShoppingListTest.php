@@ -73,3 +73,86 @@ class ShoppingListTest extends TestCase
         $response->assertRedirect(route('lists.index', ['list_id' => $list->id]));
     }
 
+    public function test_user_can_toggle_product_completion(): void
+    {
+        $user = User::factory()->create();
+        $list = ShoppingList::create([
+            'name' => 'Demo Lista',
+            'owner_id' => $user->id,
+        ]);
+        $list->members()->attach($user->id, ['role' => 'owner']);
+
+        $category = Category::create([
+            'list_id' => $list->id,
+            'name' => 'Làctics',
+        ]);
+
+        $product = Product::create([
+            'list_id' => $list->id,
+            'category_id' => $category->id,
+            'name' => 'Llet',
+            'is_completed' => false,
+            'created_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->patch(route('products.toggle', $product));
+
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'is_completed' => true,
+            'completed_by' => $user->id,
+        ]);
+
+        $response->assertRedirect(route('lists.index', ['list_id' => $list->id]));
+    }
+
+    public function test_user_can_share_list_with_another_email(): void
+    {
+        $user = User::factory()->create();
+        $list = ShoppingList::create([
+            'name' => 'Demo Evaluación',
+            'owner_id' => $user->id,
+        ]);
+        $list->members()->attach($user->id, ['role' => 'owner']);
+
+        $response = $this->actingAs($user)->post(route('lists.share', $list), [
+            'email' => 'oscar@ejemplo.com',
+        ]);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'oscar@ejemplo.com',
+        ]);
+
+        $this->assertDatabaseHas('list_invitations', [
+            'list_id' => $list->id,
+            'email' => 'oscar@ejemplo.com',
+        ]);
+
+        $response->assertRedirect(route('lists.index', ['list_id' => $list->id]));
+    }
+
+    public function test_user_can_delete_product(): void
+    {
+        $user = User::factory()->create();
+        $list = ShoppingList::create([
+            'name' => 'Demo Lista',
+            'owner_id' => $user->id,
+        ]);
+        $list->members()->attach($user->id, ['role' => 'owner']);
+
+        $product = Product::create([
+            'list_id' => $list->id,
+            'name' => 'Pan',
+            'is_completed' => false,
+            'created_by' => $user->id,
+        ]);
+
+        $response = $this->actingAs($user)->delete(route('products.destroy', $product));
+
+        $this->assertDatabaseMissing('products', [
+            'id' => $product->id,
+        ]);
+
+        $response->assertRedirect(route('lists.index', ['list_id' => $list->id]));
+    }
+}

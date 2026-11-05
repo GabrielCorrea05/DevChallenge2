@@ -113,3 +113,58 @@ class ProductController extends Controller
             ->with('status', 'Artículo añadido del catálogo.');
     }
 
+    public function toggleComplete(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        $isCompleted = !$product->is_completed;
+
+        $product->update([
+            'is_completed' => $isCompleted,
+            'completed_by' => $isCompleted ? $user->id : null,
+            'completed_at' => $isCompleted ? now() : null,
+        ]);
+
+        Activity::create([
+            'list_id' => $product->list_id,
+            'user_id' => $user->id,
+            'action' => $isCompleted ? 'completó' : 'desmarcó',
+            'subject_name' => $product->name,
+            'created_at' => now(),
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'is_completed' => $product->is_completed,
+            ]);
+        }
+
+        return redirect()->route('lists.index', ['list_id' => $product->list_id]);
+    }
+
+    public function destroy(Request $request, Product $product): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        $listId = $product->list_id;
+        $productName = $product->name;
+
+        $product->delete();
+
+        Activity::create([
+            'list_id' => $listId,
+            'user_id' => $user->id,
+            'action' => 'eliminó el producto',
+            'subject_name' => $productName,
+            'created_at' => now(),
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+            ]);
+        }
+
+        return redirect()->route('lists.index', ['list_id' => $listId])
+            ->with('status', 'Producto eliminado.');
+    }
+}

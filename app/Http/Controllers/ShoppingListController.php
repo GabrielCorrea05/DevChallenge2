@@ -133,3 +133,57 @@ class ShoppingListController extends Controller
             ->with('status', 'Lista creada con éxito.');
     }
 
+    public function share(Request $request, ShoppingList $list): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = Auth::user();
+
+        $targetUser = User::firstOrCreate(
+            ['email' => $validated['email']],
+            [
+                'name' => Str::before($validated['email'], '@'),
+                'password' => bcrypt(Str::random(16)),
+            ]
+        );
+
+        $list->members()->syncWithoutDetaching([
+            $targetUser->id => ['role' => 'member'],
+        ]);
+
+        ListInvitation::create([
+            'list_id' => $list->id,
+            'email' => $validated['email'],
+            'token' => Str::random(32),
+            'expires_at' => now()->addDays(7),
+            'accepted_at' => now(),
+        ]);
+
+        Activity::create([
+            'list_id' => $list->id,
+            'user_id' => $user->id,
+            'action' => 'compartió la lista con',
+            'subject_name' => $validated['email'],
+            'created_at' => now(),
+        ]);
+
+        return redirect()->route('lists.index', ['list_id' => $list->id])
+            ->with('status', 'Acceso concedido a ' . $validated['email']);
+    }
+
+    public function destroy(ShoppingList $list): RedirectResponse
+    {
+        $user = Auth::user();
+
+        if ($list->owner_id !== $user->id) {
+            abort(403);
+        }
+
+        $list->delete();
+
+        return redirect()->route('lists.index')
+            ->with('status', 'Lista eliminada con éxito.');
+    }
+}
